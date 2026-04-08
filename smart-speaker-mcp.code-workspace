@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "Google Home MCP Connector (Go)",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "go.toolsManagement.autoUpdate": true,
+    "editor.formatOnSave": true
+  },
+  "extensions": {
+    "recommendations": ["golang.go"]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Download Dependencies",
+      "type": "shell",
+      "command": "go mod tidy && go mod download",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "2. Build Binary",
+      "type": "shell",
+      "command": "go build -o smart-speaker-mcp . && echo '✅ Build succeeded'",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "3. Restart Claude Desktop",
+      "type": "shell",
+      "command": "osascript -e 'quit app \"Claude\"' ; sleep 1 ; open -a Claude && echo '✅ Claude restarted'",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Rebuild + Restart Claude",
+      "dependsOn": ["2. Build Binary", "3. Restart Claude Desktop"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "⚙️ First-Time Setup",
+      "type": "shell",
+      "command": "bash setup.command",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "▶ Run Server (debug)",
+      "type": "shell",
+      "command": "./smart-speaker-mcp",
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}
