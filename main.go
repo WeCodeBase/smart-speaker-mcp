@@ -310,6 +310,127 @@ func handleAlexaVolume(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	return ok(fmt.Sprintf("🔊 Volume set to %d%% on %s", level, strArg(req, "device_name"))), nil
 }
 
+func handleAlexaStop(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	device, err := alexaGetDeviceByName(strArg(req, "device_name"))
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	if err := alexaStop(device); err != nil {
+		return fail(err.Error()), nil
+	}
+	return ok("⏹  Stopped on " + strArg(req, "device_name")), nil
+}
+
+func handleAlexaGetStatus(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	device, err := alexaGetDeviceByName(strArg(req, "device_name"))
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	status, err := alexaGetStatus(device)
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	return ok(toJSON(status)), nil
+}
+
+// ── Unified smart controls ────────────────────────────────────────────────────
+
+func smartDeviceArgs(req mcp.CallToolRequest) (deviceName, deviceType string, err error) {
+	deviceName = strArg(req, "device_name")
+	if deviceName == "" {
+		deviceName = cfg.DefaultDevice
+	}
+	if deviceName == "" {
+		return "", "", fmt.Errorf("no device specified and default_device is not set in config")
+	}
+	deviceType = strArg(req, "device_type")
+	if deviceType == "" {
+		deviceType = cfg.DeviceType
+	}
+	return deviceName, deviceType, nil
+}
+
+func handleSmartPause(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	deviceName, deviceType, err := smartDeviceArgs(req)
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	switch strings.ToLower(deviceType) {
+	case "alexa":
+		device, err := alexaGetDeviceByName(deviceName)
+		if err != nil {
+			return fail(err.Error()), nil
+		}
+		if err := alexaPause(device); err != nil {
+			return fail(err.Error()), nil
+		}
+	case "both":
+		_ = ghPause(deviceName)
+		if device, err := alexaGetDeviceByName(deviceName); err == nil {
+			_ = alexaPause(device)
+		}
+	default:
+		if err := ghPause(deviceName); err != nil {
+			return fail(err.Error()), nil
+		}
+	}
+	return ok("⏸  Paused on " + deviceName), nil
+}
+
+func handleSmartResume(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	deviceName, deviceType, err := smartDeviceArgs(req)
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	switch strings.ToLower(deviceType) {
+	case "alexa":
+		device, err := alexaGetDeviceByName(deviceName)
+		if err != nil {
+			return fail(err.Error()), nil
+		}
+		if err := alexaResume(device); err != nil {
+			return fail(err.Error()), nil
+		}
+	case "both":
+		_ = ghResume(deviceName)
+		if device, err := alexaGetDeviceByName(deviceName); err == nil {
+			_ = alexaResume(device)
+		}
+	default:
+		if err := ghResume(deviceName); err != nil {
+			return fail(err.Error()), nil
+		}
+	}
+	return ok("▶️  Resumed on " + deviceName), nil
+}
+
+func handleSmartStop(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	deviceName, deviceType, err := smartDeviceArgs(req)
+	if err != nil {
+		return fail(err.Error()), nil
+	}
+	switch strings.ToLower(deviceType) {
+	case "alexa":
+		device, err := alexaGetDeviceByName(deviceName)
+		if err != nil {
+			return fail(err.Error()), nil
+		}
+		if err := alexaStop(device); err != nil {
+			return fail(err.Error()), nil
+		}
+	case "both":
+		_ = ghStop(deviceName)
+		if device, err := alexaGetDeviceByName(deviceName); err == nil {
+			_ = alexaStop(device)
+		}
+	default:
+		if err := ghStop(deviceName); err != nil {
+			return fail(err.Error()), nil
+		}
+	}
+	return ok("⏹  Stopped on " + deviceName), nil
+}
+
 // ── Local music diagnostic ────────────────────────────────────────────────────
 
 func handleListLocalMusic(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -410,7 +531,7 @@ func main() {
 		log.Printf("Warning: local file server failed to start: %v", err)
 	}
 
-	s := server.NewMCPServer("smart-speaker-mcp", "3.0.0", server.WithToolCapabilities(true))
+	s := server.NewMCPServer("smart-speaker-mcp", "3.1.0", server.WithToolCapabilities(true))
 
 	// ── Unified play (recommended) ────────────────────────────────────────────
 	s.AddTool(mcp.NewTool("smart_play",
@@ -500,6 +621,35 @@ func main() {
 		mcp.WithString("device_name", mcp.Required(), mcp.Description("Device name")),
 		levelArg(),
 	), handleAlexaVolume)
+
+	s.AddTool(mcp.NewTool("alexa_stop",
+		mcp.WithDescription("Stop playback on an Alexa device"),
+		mcp.WithString("device_name", mcp.Required(), mcp.Description("Device name")),
+	), handleAlexaStop)
+
+	s.AddTool(mcp.NewTool("alexa_get_status",
+		mcp.WithDescription("Get current playback status of an Alexa device"),
+		mcp.WithString("device_name", mcp.Required(), mcp.Description("Device name")),
+	), handleAlexaGetStatus)
+
+	// ── Unified smart controls ────────────────────────────────────────────────
+	s.AddTool(mcp.NewTool("smart_pause",
+		mcp.WithDescription("Pause playback — auto-selects device type from config. Device name optional if default is set."),
+		mcp.WithString("device_name", mcp.Description("Device to pause (default: config.default_device)")),
+		mcp.WithString("device_type", mcp.Description("google_home | alexa | both (default: config.device_type)")),
+	), handleSmartPause)
+
+	s.AddTool(mcp.NewTool("smart_resume",
+		mcp.WithDescription("Resume playback — auto-selects device type from config. Device name optional if default is set."),
+		mcp.WithString("device_name", mcp.Description("Device to resume (default: config.default_device)")),
+		mcp.WithString("device_type", mcp.Description("google_home | alexa | both (default: config.device_type)")),
+	), handleSmartResume)
+
+	s.AddTool(mcp.NewTool("smart_stop",
+		mcp.WithDescription("Stop playback — auto-selects device type from config. Device name optional if default is set."),
+		mcp.WithString("device_name", mcp.Description("Device to stop (default: config.default_device)")),
+		mcp.WithString("device_type", mcp.Description("google_home | alexa | both (default: config.device_type)")),
+	), handleSmartStop)
 
 	// ── Diagnostic + Config tools ─────────────────────────────────────────────
 	s.AddTool(mcp.NewTool("list_local_music",

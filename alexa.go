@@ -222,3 +222,32 @@ func alexaPause(device *AlexaDevice) error {
 func alexaResume(device *AlexaDevice) error {
 	return alexaSendBehavior(device, "Alexa.Media.Resume", nil)
 }
+
+func alexaStop(device *AlexaDevice) error {
+	return alexaSendBehavior(device, "Alexa.Media.Stop", nil)
+}
+
+// alexaGetStatus fetches the now-playing state for a device.
+func alexaGetStatus(device *AlexaDevice) (map[string]any, error) {
+	path := fmt.Sprintf("/api/np/player?deviceSerialNumber=%s&deviceType=%s&screenWidth=1",
+		device.SerialNumber, device.DeviceType)
+	resp, err := alexaRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		// Fall back to basic device info if player state isn't available
+		return map[string]any{
+			"device": device.Name,
+			"online": device.Online,
+			"note":   "detailed playback state not available",
+		}, nil
+	}
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parse error: %w", err)
+	}
+	return result, nil
+}
