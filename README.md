@@ -35,7 +35,7 @@ Say things like:
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/sundaranatarajan/smart-speaker-mcp.git
+git clone https://github.com/WeCodeBase/smart-speaker-mcp.git
 cd smart-speaker-mcp
 
 # 2. Run one-time setup (builds binary, creates .env, registers with Claude Desktop)
