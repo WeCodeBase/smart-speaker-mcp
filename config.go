@@ -2,22 +2,18 @@ package main
 
 // config.go — loads, saves, and applies env-var overrides for the MCP config.
 //
-// Config file location: ~/.config/smart-speaker-mcp/config.json
+// Config file location:
+//   macOS / Linux: ~/.config/smart-speaker-mcp/config.json
+//   Windows:       %APPDATA%\smart-speaker-mcp\config.json
 //
-// Every field can be overridden by an environment variable — useful for
+// Every field can also be overridden by an environment variable, useful for
 // running the MCP in Docker or CI without editing the JSON file.
 //
 // Environment variable map:
 //   SMART_SPEAKER_MUSIC_DIR       → music_dir
 //   SMART_SPEAKER_DEFAULT_DEVICE  → default_device
-//   SMART_SPEAKER_DEVICE_TYPE     → device_type  (google_home | alexa | both)
 //   SMART_SPEAKER_SOURCE          → default_source (local | youtube | url)
 //   SMART_SPEAKER_YTDLP_PATH      → ytdlp_path
-//   ALEXA_CLIENT_ID               → alexa.client_id
-//   ALEXA_CLIENT_SECRET           → alexa.client_secret
-//   ALEXA_ACCESS_TOKEN            → alexa.access_token
-//   ALEXA_REFRESH_TOKEN           → alexa.refresh_token
-//   ALEXA_CUSTOMER_ID             → alexa.customer_id
 
 import (
 	"bufio"
@@ -28,43 +24,40 @@ import (
 	"strings"
 )
 
-// ── Config structs ────────────────────────────────────────────────────────────
-
-type AlexaConfig struct {
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	CustomerID   string `json:"customer_id"`
-}
-
+// Config is the full runtime settings shape persisted to config.json.
+//
+// Defaults are populated by loadConfig() if a field is blank, then
+// applyEnvOverrides() lets environment variables win.
 type Config struct {
-	// Paths
+	// Path to the yt-dlp binary used for YouTube playback. Auto-detected
+	// from common install locations if blank.
 	YtDlpPath string `json:"ytdlp_path"`
-	MusicDir  string `json:"music_dir"`
 
-	// Playback defaults (used by smart_play when not specified in the call)
-	DefaultDevice string `json:"default_device"` // e.g. "Family Room speaker"
-	DeviceType    string `json:"device_type"`    // "google_home" | "alexa" | "both"
-	DefaultSource string `json:"default_source"` // "local" | "youtube" | "url"
+	// Path to the local music library searched by source=local.
+	MusicDir string `json:"music_dir"`
 
-	// Alexa OAuth credentials
-	Alexa AlexaConfig `json:"alexa"`
+	// Default speaker name used when a tool call doesn't specify one.
+	// Must match the name shown by `discover_devices`.
+	DefaultDevice string `json:"default_device"`
+
+	// Default audio source when not specified: "local" | "youtube" | "url".
+	DefaultSource string `json:"default_source"`
 }
 
 var cfg Config
 
 var (
 	configDir  = filepath.Join(os.Getenv("HOME"), ".config", "smart-speaker-mcp")
-	configFile = filepath.Join(os.Getenv("HOME"), ".config", "smart-speaker-mcp", "config.json")
-	dotEnvFile = filepath.Join(os.Getenv("HOME"), ".config", "smart-speaker-mcp", ".env")
+	configFile = filepath.Join(configDir, "config.json")
+	dotEnvFile = filepath.Join(configDir, ".env")
 )
 
 // ── Load / Save ───────────────────────────────────────────────────────────────
 
+// loadConfig reads .env and config.json, fills in defaults, and applies
+// environment overrides. Called once at startup from main().
 func loadConfig() error {
-	// 1. Load .env file first — sets os env vars so applyEnvOverrides() picks them up
-	loadDotEnv(dotEnvFile)
+	loadDotEnv(dotEnvFile) // populates os.Getenv before applyEnvOverrides
 
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		cfg = defaultConfig()
@@ -81,22 +74,18 @@ func loadConfig() error {
 		}
 	}
 
-	// Fill blank fields with defaults
+	// Fill blanks with defaults
 	if cfg.YtDlpPath == "" {
 		cfg.YtDlpPath = detectYtDlp()
 	}
 	if cfg.MusicDir == "" {
-		cfg.MusicDir = filepath.Join(os.Getenv("HOME"), "sundar", "songs")
-	}
-	if cfg.DeviceType == "" {
-		cfg.DeviceType = "google_home"
+		cfg.MusicDir = filepath.Join(os.Getenv("HOME"), "Music")
 	}
 	if cfg.DefaultSource == "" {
 		cfg.DefaultSource = "local"
 	}
 
-	// Environment variables always win over the JSON file
-	applyEnvOverrides()
+	applyEnvOverrides() // env always wins
 	return nil
 }
 
@@ -114,15 +103,14 @@ func saveConfig() error {
 func defaultConfig() Config {
 	return Config{
 		YtDlpPath:     detectYtDlp(),
-		MusicDir:      filepath.Join(os.Getenv("HOME"), "sundar", "songs"),
+		MusicDir:      filepath.Join(os.Getenv("HOME"), "Music"),
 		DefaultDevice: "",
-		DeviceType:    "google_home",
 		DefaultSource: "local",
 	}
 }
 
-// applyEnvOverrides reads well-known environment variables and overlays them
-// on top of whatever was loaded from the JSON config file.
+// applyEnvOverrides reads well-known env vars and overlays them on top of
+// whatever was loaded from the JSON file. Empty env vars are ignored.
 func applyEnvOverrides() {
 	if v := os.Getenv("SMART_SPEAKER_MUSIC_DIR"); v != "" {
 		cfg.MusicDir = v
@@ -130,40 +118,21 @@ func applyEnvOverrides() {
 	if v := os.Getenv("SMART_SPEAKER_DEFAULT_DEVICE"); v != "" {
 		cfg.DefaultDevice = v
 	}
-	if v := os.Getenv("SMART_SPEAKER_DEVICE_TYPE"); v != "" {
-		cfg.DeviceType = v
-	}
 	if v := os.Getenv("SMART_SPEAKER_SOURCE"); v != "" {
 		cfg.DefaultSource = v
 	}
 	if v := os.Getenv("SMART_SPEAKER_YTDLP_PATH"); v != "" {
 		cfg.YtDlpPath = v
 	}
-	// Alexa credentials via env (useful for keeping secrets out of the JSON file)
-	if v := os.Getenv("ALEXA_CLIENT_ID"); v != "" {
-		cfg.Alexa.ClientID = v
-	}
-	if v := os.Getenv("ALEXA_CLIENT_SECRET"); v != "" {
-		cfg.Alexa.ClientSecret = v
-	}
-	if v := os.Getenv("ALEXA_ACCESS_TOKEN"); v != "" {
-		cfg.Alexa.AccessToken = v
-	}
-	if v := os.Getenv("ALEXA_REFRESH_TOKEN"); v != "" {
-		cfg.Alexa.RefreshToken = v
-	}
-	if v := os.Getenv("ALEXA_CUSTOMER_ID"); v != "" {
-		cfg.Alexa.CustomerID = v
-	}
 }
 
 // loadDotEnv reads a .env file and sets each KEY=VALUE pair as an OS
-// environment variable (only if the variable is not already set by the shell).
-// Lines starting with # are comments; blank lines are ignored.
+// environment variable, but only when the variable isn't already set by
+// the shell (so explicit shell vars always win).
 func loadDotEnv(path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		return // file doesn't exist yet — that's fine
+		return // file doesn't exist — that's fine
 	}
 	defer f.Close()
 
@@ -184,7 +153,6 @@ func loadDotEnv(path string) {
 			(val[0] == '\'' && val[len(val)-1] == '\'')) {
 			val = val[1 : len(val)-1]
 		}
-		// Only set if not already in the environment
 		if os.Getenv(key) == "" {
 			_ = os.Setenv(key, val)
 		}
@@ -193,13 +161,14 @@ func loadDotEnv(path string) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// detectYtDlp tries common install locations across macOS / Linux.
+// detectYtDlp tries common install locations across macOS / Linux / Windows.
 func detectYtDlp() string {
 	candidates := []string{
 		"/usr/local/bin/yt-dlp",
 		"/opt/homebrew/bin/yt-dlp",
 		"/usr/bin/yt-dlp",
 		"/home/linuxbrew/.linuxbrew/bin/yt-dlp",
+		`C:\Program Files\yt-dlp\yt-dlp.exe`,
 	}
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {

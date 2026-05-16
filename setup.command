@@ -35,9 +35,17 @@ echo "▶ Downloading Go dependencies..."
 go mod tidy && go mod download
 echo "  ✅ Done"
 
+# ── Static analysis (catches imports-out-of-order, unused vars, format strings, etc.) ─
+echo "▶ Running go vet..."
+if ! go vet ./...; then
+    echo "  ❌ go vet found problems — fix them and re-run setup."
+    exit 1
+fi
+echo "  ✅ vet passed"
+
 # ── Build ─────────────────────────────────────────────────────────────────────
-echo "▶ Building binary..."
-go build -o smart-speaker-mcp .
+echo "▶ Building binary for $(uname -m)..."
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=4.0.0" -o smart-speaker-mcp .
 if [ $? -ne 0 ]; then echo "  ❌ Build failed"; exit 1; fi
 echo "  ✅ $BINARY_PATH"
 
@@ -54,21 +62,13 @@ if [ ! -f "$ENV_FILE" ]; then
 
 # ── Playback defaults ─────────────────────────────────────────────────────────
 SMART_SPEAKER_DEFAULT_DEVICE=Family Room speaker
-SMART_SPEAKER_DEVICE_TYPE=google_home
 SMART_SPEAKER_SOURCE=local
 
 # ── Local music ───────────────────────────────────────────────────────────────
-SMART_SPEAKER_MUSIC_DIR=~/sundar/songs
+SMART_SPEAKER_MUSIC_DIR=~/Music
 
-# ── yt-dlp ────────────────────────────────────────────────────────────────────
-SMART_SPEAKER_YTDLP_PATH=/usr/local/bin/yt-dlp
-
-# ── Amazon Alexa (fill in when ready) ────────────────────────────────────────
-ALEXA_CLIENT_ID=
-ALEXA_CLIENT_SECRET=
-ALEXA_ACCESS_TOKEN=
-ALEXA_REFRESH_TOKEN=
-ALEXA_CUSTOMER_ID=
+# ── yt-dlp (auto-detected from PATH if blank) ────────────────────────────────
+SMART_SPEAKER_YTDLP_PATH=
 ENVEOF
     echo "  ✅ Created: $ENV_FILE"
 else
@@ -93,11 +93,17 @@ print("  ✅ Registered: $BINARY_PATH")
 PYEOF
 
 echo ""
-echo "╔════════════════════════════════════════════════════╗"
-echo "║  ✅ Setup complete!                                ║"
-echo "║                                                    ║"
-echo "║  After any code change, use VS Code task:          ║"
-echo "║  👉 '🔄 Rebuild + Restart Claude'                  ║"
-echo "║     (one click — builds & restarts automatically)  ║"
-echo "╚════════════════════════════════════════════════════╝"
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║  ✅ Setup complete!                                            ║"
+echo "║                                                                ║"
+echo "║  After any code change, rebuild + restart Claude:              ║"
+echo "║                                                                ║"
+echo "║  • macOS / Linux  →  make rebuild                              ║"
+echo "║  • Windows (PS)   →  make rebuild   (Git Bash / MSYS / WSL)    ║"
+echo "║                       …or:  go build .  +  restart Claude      ║"
+echo "║  • VS Code        →  ⌘⇧P → Run Task → 🔄 Rebuild + Restart    ║"
+echo "║                                                                ║"
+echo "║  Just rebuild (no restart):  make build   /   go build .       ║"
+echo "║  Just restart Claude:        make restart-claude               ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""

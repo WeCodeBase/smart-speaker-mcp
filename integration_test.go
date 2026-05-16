@@ -154,7 +154,6 @@ func TestIntegration_ConfigLoadSave_FullCycle(t *testing.T) {
 
 	cfg = Config{
 		DefaultDevice: "Integration Speaker",
-		DeviceType:    "both",
 		DefaultSource: "youtube",
 	}
 	if err := saveConfig(); err != nil {
@@ -169,7 +168,7 @@ func TestIntegration_ConfigLoadSave_FullCycle(t *testing.T) {
 	if cfg.DefaultDevice != "Integration Speaker" {
 		t.Errorf("DefaultDevice = %q, want Integration Speaker", cfg.DefaultDevice)
 	}
-	if cfg.DeviceType != "both" {
-		t.Errorf("DeviceType = %q, want both", cfg.DeviceType)
+	if cfg.DefaultSource != "youtube" {
+		t.Errorf("DefaultSource = %q, want youtube", cfg.DefaultSource)
 	}
 }

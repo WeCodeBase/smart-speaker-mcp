@@ -1,161 +1,179 @@
 # smart-speaker-mcp
 
-Control Google Home and Amazon Alexa speakers through Claude using the [Model Context Protocol](https://modelcontextprotocol.io).
+Control Chromecast / Google Home / Nest speakers from Claude (or any MCP client) via the [Model Context Protocol](https://modelcontextprotocol.io). Cross-platform — runs on macOS, Windows, and Linux.
 
 Say things like:
-- *"Play Ilaiyaraaja on Family Room speaker"*
+
+- *"Play Ilaiyaraaja on the Family Room speaker"*
 - *"Pause the music"*
-- *"Set volume to 50% on Kitchen display"*
-- *"Play Tamil hits on Family Room speaker"*
+- *"Set volume to 50% on the kitchen display"*
+- *"What's playing right now?"*
 
 ---
 
-## Features
+## Install
 
-- **Google Home / Chromecast** — local LAN playback, no cloud required
-- **Amazon Alexa** — cloud control via OAuth2
-- **Local music library** — plays your MP3/FLAC/M4A files directly (default)
-- **YouTube fallback** — streams via yt-dlp when no local file matches
-- **Unified `smart_play`** — one command, reads defaults from config
-- **`.env` config** — all settings in one file, no code changes needed
+> One line per OS. Downloads a prebuilt binary, ensures `yt-dlp` is present, creates the config file, and registers the MCP server with Claude Desktop. No Go toolchain required.
 
----
-
-## Prerequisites
-
-| Tool | Install |
-|------|---------|
-| [Go 1.21+](https://go.dev/dl/) | `brew install go` |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | `brew install yt-dlp` |
-| [Claude Desktop](https://claude.ai/download) | Download and install |
-
----
-
-## Installation
+**macOS / Linux:**
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/WeCodeBase/smart-speaker-mcp.git
-cd smart-speaker-mcp
-
-# 2. Run one-time setup (builds binary, creates .env, registers with Claude Desktop)
-bash setup.command
-
-# 3. Restart Claude Desktop
+curl -fsSL https://raw.githubusercontent.com/WeCodeBase/smart-speaker-mcp/main/install.sh | bash
 ```
 
-That's it. Ask Claude: *"Discover Google Home devices"*
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/WeCodeBase/smart-speaker-mcp/main/install.ps1 | iex
+```
+
+After install, **restart Claude Desktop**, then ask Claude: *"Discover my speakers."*
 
 ---
 
-## Configuration
+## Web control panel
 
-The `.env` file is created at `~/.config/smart-speaker-mcp/.env` on first run:
+The server hosts a small web UI on **http://localhost:8765** that lets you play music, control volume, and re-scan for devices from any browser on the same Wi-Fi (laptop or phone). It's running whenever the MCP server is running.
+
+To override the port set `SMART_SPEAKER_WEB_PORT` in `.env`. If 8765 is taken, the server falls back to a random port and prints the chosen URL to stderr — visible in Claude Desktop's MCP server log.
+
+---
+
+## Tools exposed
+
+| Tool | What it does |
+|------|-------------|
+| `discover_devices` | Scan Wi-Fi for Chromecast / Google Home / Nest devices |
+| `play` | Play a song, artist, or direct URL on a speaker |
+| `pause` / `resume` / `stop` | Playback controls |
+| `set_volume` | Set volume 0–100 |
+| `get_status` | Current playback state |
+| `list_local_music` | List audio files in your music folder |
+| `get_config` / `set_config` | View / update runtime configuration |
+
+All playback tools accept `device_name` as an optional argument and fall back to `default_device` from your config when omitted.
+
+---
+
+## Configuration (`.env`)
+
+Located at `~/.config/smart-speaker-mcp/.env` on macOS/Linux, or `%APPDATA%\smart-speaker-mcp\.env` on Windows.
 
 ```bash
-# Which speaker to use by default
+# Default speaker (exact name shown by discover_devices)
 SMART_SPEAKER_DEFAULT_DEVICE=Family Room speaker
 
-# Device type: google_home | alexa | both
-SMART_SPEAKER_DEVICE_TYPE=google_home
-
-# Audio source: local | youtube | url
+# Audio source priority: local | youtube | url
 SMART_SPEAKER_SOURCE=local
 
-# Path to your local music folder
+# Path to your local music folder (.mp3 / .flac / .m4a / .wav)
 SMART_SPEAKER_MUSIC_DIR=~/Music
 
-# yt-dlp binary path (auto-detected if blank)
-SMART_SPEAKER_YTDLP_PATH=/usr/local/bin/yt-dlp
+# Path to yt-dlp binary (auto-detected if blank)
+SMART_SPEAKER_YTDLP_PATH=
 
-# Amazon Alexa credentials (see Alexa Setup below)
-ALEXA_CLIENT_ID=
-ALEXA_CLIENT_SECRET=
-ALEXA_ACCESS_TOKEN=
-ALEXA_REFRESH_TOKEN=
-ALEXA_CUSTOMER_ID=
+# Port for the embedded web UI (default 8765)
+SMART_SPEAKER_WEB_PORT=8765
 ```
 
-Edit this file and run **`🔄 Rebuild + Restart Claude`** in VS Code to apply.
+Edit this file and restart Claude Desktop to apply, or use the `set_config` tool to update values without editing the file.
 
 ---
 
-## Available Tools
+## What the installer puts where
 
-### Unified
-| Tool | What it does |
-|------|-------------|
-| `smart_play` | Play now or schedule — reads device/source from config |
-
-### Google Home
-| Tool | What it does |
-|------|-------------|
-| `gh_discover_devices` | Find all Google Home / Chromecast devices on Wi-Fi |
-| `gh_play_music` | Play a song or stream on a specific device |
-| `gh_pause` | Pause playback |
-| `gh_resume` | Resume playback |
-| `gh_stop` | Stop playback |
-| `gh_set_volume` | Set volume 0–100 |
-| `gh_get_status` | Get current playback status |
-
-### Alexa
-| Tool | What it does |
-|------|-------------|
-| `alexa_auth` | Get Amazon OAuth URL |
-| `alexa_auth_complete` | Complete auth with the OAuth code |
-| `alexa_discover_devices` | List Echo devices on your account |
-| `alexa_play_music` | Play on an Echo device |
-| `alexa_pause` / `alexa_resume` | Pause/resume |
-| `alexa_set_volume` | Set volume 0–100 |
-
-### Utilities
-| Tool | What it does |
-|------|-------------|
-| `list_local_music` | List files in your music directory |
-| `get_config` | Show current config + available env vars |
-| `set_config` | Update config at runtime |
+| OS | Binary | `.env` config | Claude Desktop config |
+|----|--------|---------------|----------------------|
+| macOS | `~/.local/bin/smart-speaker-mcp` (or project dir if built locally) | `~/.config/smart-speaker-mcp/.env` | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Linux | `~/.local/bin/smart-speaker-mcp` | `~/.config/smart-speaker-mcp/.env` | `~/.config/Claude/claude_desktop_config.json` |
+| Windows | `%LOCALAPPDATA%\Programs\smart-speaker-mcp\smart-speaker-mcp.exe` | `%APPDATA%\smart-speaker-mcp\.env` | `%APPDATA%\Claude\claude_desktop_config.json` |
 
 ---
 
-## Alexa Setup
+## First-launch warnings (expected)
 
-1. Go to [developer.amazon.com](https://developer.amazon.com) → **Login with Amazon** → Create a new app
-2. Set redirect URI to `https://localhost`
-3. Copy **Client ID** and **Client Secret** into your `.env`
-4. Ask Claude: *"Connect my Alexa account"* — it will give you a URL to open
-5. Authorise, copy the `code` from the redirect URL, and say: *"Complete Alexa auth: \<code\>"*
+| OS | What you'll see | What to click |
+|----|-----------------|---------------|
+| macOS | "smart-speaker-mcp cannot be opened — unidentified developer" | System Settings → Privacy & Security → "Open Anyway". Or run `xattr -d com.apple.quarantine ~/.local/bin/smart-speaker-mcp` once. |
+| Windows | SmartScreen: "Windows protected your PC" | "More info" → "Run anyway" |
+| Windows | Defender Firewall prompt (local file server binds to LAN) | "Allow access" on Private networks |
+| Linux | None typically | — |
+
+These prompts appear because the binary isn't code-signed. Code-signing certificates cost $99–$400/yr and will be added if/when the project warrants it.
 
 ---
 
-## Development
+## Build from source (optional)
 
-After editing code, rebuild with one VS Code task:
+You only need this if you're modifying the code. Otherwise the installer above is faster.
 
+**Prerequisites:** Go 1.21+, `yt-dlp`, Claude Desktop.
+
+```bash
+git clone https://github.com/WeCodeBase/smart-speaker-mcp.git
+cd smart-speaker-mcp
 ```
-⌘⇧P → Run Task → 🔄 Rebuild + Restart Claude
+
+### Initial setup (per platform)
+
+| Platform | Command | What it does |
+|----------|---------|--------------|
+| macOS | `bash setup.command` | Builds, creates `.env`, registers with Claude Desktop |
+| Linux | `bash setup.sh` | Same — Debian/Ubuntu tuned, falls back to dnf/pacman/pip |
+| Windows (PowerShell) | `.\setup.ps1` | Same — uses winget for `yt-dlp` |
+| Windows (cmd.exe) | `setup.bat` | Thin wrapper around `setup.ps1` |
+
+### Rebuild after a code change
+
+| Platform | Build only | Build + restart Claude |
+|----------|------------|-----------------------|
+| macOS / Linux | `go build .` *or* `make build` | `make rebuild` |
+| Windows (PowerShell) | `go build .` | `go build . ; Stop-Process -Name Claude -Force ; Start-Process Claude` |
+| Windows (Git Bash / WSL) | `make build` | `make rebuild` |
+| VS Code (any platform) | — | `Ctrl+Shift+P` → Run Task → **🔄 Rebuild + Restart Claude** |
+
+`make rebuild` auto-detects your OS and uses the right "restart Claude" command for it.
+
+### Cross-compile all release targets
+
+```bash
+make build-all   # darwin-arm64, darwin-amd64, windows-amd64, linux-amd64, linux-arm64
 ```
 
-This builds the binary and restarts Claude Desktop automatically.
+---
+
+## Releasing (maintainer notes)
+
+Tagged releases are built and published automatically by `.github/workflows/release.yml`.
+
+```bash
+make tag VERSION=v4.0.0
+```
+
+The Action cross-compiles for all five OS/arch targets and attaches the binaries plus `SHA256SUMS.txt` to the GitHub Release.
 
 ---
 
 ## How it works
 
 ```
-Claude Desktop
-    │  stdio (MCP)
-    ▼
-smart-speaker-mcp (Go binary)
-    ├── Local HTTP server  ──► Chromecast fetches audio over LAN
-    ├── go-chromecast      ──► Google Home / Chromecast control
-    ├── Alexa Behaviors API──► Amazon Echo control (cloud)
-    └── yt-dlp subprocess  ──► YouTube audio stream URLs
+Claude Desktop  ──stdio (MCP)──▶  smart-speaker-mcp (Go binary, single static executable)
+                                       ├── go-chromecast   ──▶ Chromecast / Google Home control over LAN
+                                       ├── HTTP server     ──▶ Streams local files to Chromecast over Wi-Fi
+                                       ├── HTTP server     ──▶ Web UI for browser/phone control
+                                       └── yt-dlp          ──▶ YouTube audio stream URLs
 ```
 
-Local files are served over a lightweight embedded HTTP server so Chromecast (a network device) can fetch them directly from your Mac over Wi-Fi.
+Local audio files are served over a lightweight embedded HTTP server so Chromecast (a network device) can fetch them directly from your computer over Wi-Fi.
+
+---
+
+## Why no Alexa support?
+
+Earlier versions tried. Amazon retired the Pre-built Routines API on 2026-05-13 and stopped accepting new AVS product registrations before that, so the original direct-control approach can no longer work for any new account. The remaining third-party paths (Voice Monkey, cookie-based reverse engineering of the Alexa app) all add either external service dependencies or brittle scrapers that break when Amazon updates their auth flow. We removed Alexa entirely in v4.0.0 to keep the project clean. If you need Echo control, [Voice Monkey](https://voicemonkey.io) is the cleanest standalone option today — and may return as an optional plugin to this project in a future version. See [CHANGELOG.md](CHANGELOG.md) for full background.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — Copyright (c) 2026 Sundara Senthil. See [LICENSE](LICENSE).

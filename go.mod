@@ -1,4 +1,4 @@
-module github.com/sundaranatarajan/smart-speaker-mcp
+module github.com/WeCodeBase/smart-speaker-mcp
 
 go 1.23.2
 

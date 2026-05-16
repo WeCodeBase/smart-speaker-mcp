@@ -108,7 +108,6 @@ func TestLoadDotEnv_IgnoresCommentsAndBlankLines(t *testing.T) {
 }
 
 func TestLoadDotEnv_NonExistentFile_NoPanic(t *testing.T) {
-	// Must not panic or error — silently no-op
 	loadDotEnv("/tmp/nonexistent-smart-speaker-test.env")
 }
 
@@ -134,13 +133,12 @@ func TestApplyEnvOverrides_SmartSpeakerVars(t *testing.T) {
 	defer restoreCfg(saved)
 	restore := clearEnv(
 		"SMART_SPEAKER_MUSIC_DIR", "SMART_SPEAKER_DEFAULT_DEVICE",
-		"SMART_SPEAKER_DEVICE_TYPE", "SMART_SPEAKER_SOURCE", "SMART_SPEAKER_YTDLP_PATH",
+		"SMART_SPEAKER_SOURCE", "SMART_SPEAKER_YTDLP_PATH",
 	)
 	defer restore()
 
 	os.Setenv("SMART_SPEAKER_MUSIC_DIR", "/tmp/music")
 	os.Setenv("SMART_SPEAKER_DEFAULT_DEVICE", "Living Room")
-	os.Setenv("SMART_SPEAKER_DEVICE_TYPE", "alexa")
 	os.Setenv("SMART_SPEAKER_SOURCE", "youtube")
 	os.Setenv("SMART_SPEAKER_YTDLP_PATH", "/usr/bin/yt-dlp")
 
@@ -150,41 +148,8 @@ func TestApplyEnvOverrides_SmartSpeakerVars(t *testing.T) {
 	tests := []struct{ got, want, field string }{
 		{cfg.MusicDir, "/tmp/music", "MusicDir"},
 		{cfg.DefaultDevice, "Living Room", "DefaultDevice"},
-		{cfg.DeviceType, "alexa", "DeviceType"},
 		{cfg.DefaultSource, "youtube", "DefaultSource"},
 		{cfg.YtDlpPath, "/usr/bin/yt-dlp", "YtDlpPath"},
-	}
-	for _, tt := range tests {
-		if tt.got != tt.want {
-			t.Errorf("%s = %q, want %q", tt.field, tt.got, tt.want)
-		}
-	}
-}
-
-func TestApplyEnvOverrides_AlexaCredentials(t *testing.T) {
-	saved := saveCfg()
-	defer restoreCfg(saved)
-	restore := clearEnv(
-		"ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET",
-		"ALEXA_ACCESS_TOKEN", "ALEXA_REFRESH_TOKEN", "ALEXA_CUSTOMER_ID",
-	)
-	defer restore()
-
-	os.Setenv("ALEXA_CLIENT_ID", "cid123")
-	os.Setenv("ALEXA_CLIENT_SECRET", "csec456")
-	os.Setenv("ALEXA_ACCESS_TOKEN", "acc789")
-	os.Setenv("ALEXA_REFRESH_TOKEN", "ref000")
-	os.Setenv("ALEXA_CUSTOMER_ID", "cust111")
-
-	cfg = Config{}
-	applyEnvOverrides()
-
-	tests := []struct{ got, want, field string }{
-		{cfg.Alexa.ClientID, "cid123", "ClientID"},
-		{cfg.Alexa.ClientSecret, "csec456", "ClientSecret"},
-		{cfg.Alexa.AccessToken, "acc789", "AccessToken"},
-		{cfg.Alexa.RefreshToken, "ref000", "RefreshToken"},
-		{cfg.Alexa.CustomerID, "cust111", "CustomerID"},
 	}
 	for _, tt := range tests {
 		if tt.got != tt.want {
@@ -244,8 +209,7 @@ func TestExpandHome_TildeOnly(t *testing.T) {
 // ── detectYtDlp ───────────────────────────────────────────────────────────────
 
 func TestDetectYtDlp_ReturnsNonEmptyString(t *testing.T) {
-	result := detectYtDlp()
-	if result == "" {
+	if result := detectYtDlp(); result == "" {
 		t.Error("detectYtDlp() returned empty string")
 	}
 }
@@ -254,12 +218,11 @@ func TestDetectYtDlp_ReturnsNonEmptyString(t *testing.T) {
 
 func TestDefaultConfig_HasExpectedDefaults(t *testing.T) {
 	c := defaultConfig()
-
-	if c.DeviceType != "google_home" {
-		t.Errorf("DeviceType = %q, want google_home", c.DeviceType)
-	}
 	if c.DefaultSource != "local" {
 		t.Errorf("DefaultSource = %q, want local", c.DefaultSource)
+	}
+	if c.MusicDir == "" {
+		t.Error("MusicDir is empty in default config")
 	}
 }
 
@@ -283,9 +246,7 @@ func TestSaveConfig_RoundTrip(t *testing.T) {
 		YtDlpPath:     "/test/yt-dlp",
 		MusicDir:      "/test/music",
 		DefaultDevice: "Test Speaker",
-		DeviceType:    "alexa",
 		DefaultSource: "youtube",
-		Alexa:         AlexaConfig{ClientID: "test-id"},
 	}
 
 	if err := saveConfig(); err != nil {
@@ -305,10 +266,10 @@ func TestSaveConfig_RoundTrip(t *testing.T) {
 	if loaded.DefaultDevice != "Test Speaker" {
 		t.Errorf("round-trip DefaultDevice = %q, want Test Speaker", loaded.DefaultDevice)
 	}
-	if loaded.DeviceType != "alexa" {
-		t.Errorf("round-trip DeviceType = %q, want alexa", loaded.DeviceType)
+	if loaded.DefaultSource != "youtube" {
+		t.Errorf("round-trip DefaultSource = %q, want youtube", loaded.DefaultSource)
 	}
-	if loaded.Alexa.ClientID != "test-id" {
-		t.Errorf("round-trip Alexa.ClientID = %q, want test-id", loaded.Alexa.ClientID)
+	if loaded.MusicDir != "/test/music" {
+		t.Errorf("round-trip MusicDir = %q, want /test/music", loaded.MusicDir)
 	}
 }

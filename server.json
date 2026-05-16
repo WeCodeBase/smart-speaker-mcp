@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.WeCodeBase/smart-speaker-mcp",
+  "description": "Control Chromecast / Google Home / Nest speakers from Claude Desktop using natural language. Local LAN, no cloud.",
+  "version": "4.0.0",
+  "homepage": "https://github.com/WeCodeBase/smart-speaker-mcp",
+  "license": "MIT",
+  "categories": ["home-automation", "media", "smart-speakers"],
+  "tags": ["google-home", "chromecast", "nest", "music", "iot", "mdns"],
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/WeCodeBase/smart-speaker-mcp/releases/download/v4.0.0/smart-speaker-mcp-darwin-arm64",
+      "version": "4.0.0",
+      "platform": "darwin/arm64",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/WeCodeBase/smart-speaker-mcp/releases/download/v4.0.0/smart-speaker-mcp-darwin-amd64",
+      "version": "4.0.0",
+      "platform": "darwin/amd64",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/WeCodeBase/smart-speaker-mcp/releases/download/v4.0.0/smart-speaker-mcp-linux-amd64",
+      "version": "4.0.0",
+      "platform": "linux/amd64",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/WeCodeBase/smart-speaker-mcp/releases/download/v4.0.0/smart-speaker-mcp-linux-arm64",
+      "version": "4.0.0",
+      "platform": "linux/arm64",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/WeCodeBase/smart-speaker-mcp/releases/download/v4.0.0/smart-speaker-mcp-windows-amd64.exe",
+      "version": "4.0.0",
+      "platform": "windows/amd64",
+      "transport": { "type": "stdio" }
+    }
+  ],
+  "tools": [
+    { "name": "discover_devices",  "description": "Scan Wi-Fi via mDNS for Chromecast / Google Home / Nest devices" },
+    { "name": "play",              "description": "Play a song, artist, or direct URL on a speaker" },
+    { "name": "pause",             "description": "Pause playback" },
+    { "name": "resume",            "description": "Resume playback" },
+    { "name": "stop",              "description": "Stop playback" },
+    { "name": "set_volume",        "description": "Set volume 0–100" },
+    { "name": "get_status",        "description": "Get current playback status" },
+    { "name": "list_local_music",  "description": "List audio files in the configured local music directory" },
+    { "name": "get_config",        "description": "Show current configuration" },
+    { "name": "set_config",        "description": "Update one or more configuration settings" }
+  ]
+}
