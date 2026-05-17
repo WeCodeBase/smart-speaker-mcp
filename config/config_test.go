@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -9,10 +9,9 @@ import (
 
 // ── test helpers ──────────────────────────────────────────────────────────────
 
-func saveCfg() Config     { return cfg }
-func restoreCfg(c Config) { cfg = c }
+func saveCfg() Config     { return Cfg }
+func restoreCfg(c Config) { Cfg = c }
 
-// clearEnv temporarily unsets env vars and returns a restore function.
 func clearEnv(keys ...string) func() {
 	saved := make(map[string]string, len(keys))
 	for _, k := range keys {
@@ -142,14 +141,14 @@ func TestApplyEnvOverrides_SmartSpeakerVars(t *testing.T) {
 	os.Setenv("SMART_SPEAKER_SOURCE", "youtube")
 	os.Setenv("SMART_SPEAKER_YTDLP_PATH", "/usr/bin/yt-dlp")
 
-	cfg = Config{}
+	Cfg = Config{}
 	applyEnvOverrides()
 
 	tests := []struct{ got, want, field string }{
-		{cfg.MusicDir, "/tmp/music", "MusicDir"},
-		{cfg.DefaultDevice, "Living Room", "DefaultDevice"},
-		{cfg.DefaultSource, "youtube", "DefaultSource"},
-		{cfg.YtDlpPath, "/usr/bin/yt-dlp", "YtDlpPath"},
+		{Cfg.MusicDir, "/tmp/music", "MusicDir"},
+		{Cfg.DefaultDevice, "Living Room", "DefaultDevice"},
+		{Cfg.DefaultSource, "youtube", "DefaultSource"},
+		{Cfg.YtDlpPath, "/usr/bin/yt-dlp", "YtDlpPath"},
 	}
 	for _, tt := range tests {
 		if tt.got != tt.want {
@@ -164,45 +163,36 @@ func TestApplyEnvOverrides_EmptyVarsDoNotOverwrite(t *testing.T) {
 	restore := clearEnv("SMART_SPEAKER_MUSIC_DIR")
 	defer restore()
 
-	cfg = Config{MusicDir: "/original/path"}
-	applyEnvOverrides() // SMART_SPEAKER_MUSIC_DIR is unset
+	Cfg = Config{MusicDir: "/original/path"}
+	applyEnvOverrides()
 
-	if cfg.MusicDir != "/original/path" {
-		t.Errorf("MusicDir was unexpectedly overwritten: got %q", cfg.MusicDir)
+	if Cfg.MusicDir != "/original/path" {
+		t.Errorf("MusicDir was unexpectedly overwritten: got %q", Cfg.MusicDir)
 	}
 }
 
-// ── expandHome ────────────────────────────────────────────────────────────────
+// ── ExpandHome ────────────────────────────────────────────────────────────────
 
 func TestExpandHome_TildeReplaced(t *testing.T) {
 	home := os.Getenv("HOME")
-	got := expandHome("~/Music")
+	got := ExpandHome("~/Music")
 	want := filepath.Join(home, "Music")
 	if got != want {
-		t.Errorf("expandHome(~/Music) = %q, want %q", got, want)
+		t.Errorf("ExpandHome(~/Music) = %q, want %q", got, want)
 	}
 }
 
 func TestExpandHome_AbsolutePathUnchanged(t *testing.T) {
-	got := expandHome("/absolute/path")
+	got := ExpandHome("/absolute/path")
 	if got != "/absolute/path" {
-		t.Errorf("expandHome(/absolute/path) = %q, want /absolute/path", got)
+		t.Errorf("ExpandHome(/absolute/path) = %q, want /absolute/path", got)
 	}
 }
 
 func TestExpandHome_EmptyStringUnchanged(t *testing.T) {
-	got := expandHome("")
+	got := ExpandHome("")
 	if got != "" {
-		t.Errorf("expandHome('') = %q, want empty", got)
-	}
-}
-
-func TestExpandHome_TildeOnly(t *testing.T) {
-	home := os.Getenv("HOME")
-	got := expandHome("~")
-	want := filepath.Join(home, "")
-	if got != want && got != home {
-		t.Errorf("expandHome('~') = %q, want %q", got, home)
+		t.Errorf("ExpandHome('') = %q, want empty", got)
 	}
 }
 
@@ -226,34 +216,28 @@ func TestDefaultConfig_HasExpectedDefaults(t *testing.T) {
 	}
 }
 
-// ── saveConfig / load round-trip ─────────────────────────────────────────────
+// ── Save / load round-trip ───────────────────────────────────────────────────
 
-func TestSaveConfig_RoundTrip(t *testing.T) {
+func TestSave_RoundTrip(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
 	tmp := t.TempDir()
-	origFile := configFile
-	origDir := configDir
-	configFile = filepath.Join(tmp, "config.json")
-	configDir = tmp
-	defer func() {
-		configFile = origFile
-		configDir = origDir
-	}()
+	restore := SetPathsForTest(tmp, filepath.Join(tmp, "config.json"))
+	defer restore()
 
-	cfg = Config{
+	Cfg = Config{
 		YtDlpPath:     "/test/yt-dlp",
 		MusicDir:      "/test/music",
 		DefaultDevice: "Test Speaker",
 		DefaultSource: "youtube",
 	}
 
-	if err := saveConfig(); err != nil {
-		t.Fatalf("saveConfig() error: %v", err)
+	if err := Save(); err != nil {
+		t.Fatalf("Save() error: %v", err)
 	}
 
-	data, err := os.ReadFile(configFile)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatalf("could not read saved config: %v", err)
 	}

@@ -1,13 +1,11 @@
-package main
+package mcpserver
 
-// webui.go — embedded HTTP control panel.
+// ui.go — embedded HTTP web UI for browser/phone control.
 //
-// This serves a single-page web UI that calls the same handler functions
-// as the MCP tools, so anything Claude can do, you can do from a browser
-// on your laptop or phone (same Wi-Fi).
-//
-// The UI is registered on the same HTTP server as the Chromecast file-stream
-// route in httpserver.go, so there's only one listening port to manage.
+// Mounts a single-page HTML control panel at "/" and a small JSON API
+// at "/api/*" on the same mux as the streaming server. The API handlers
+// reuse the MCP tool handlers (handlePlay, handlePause, etc.) so anything
+// Claude can do, you can do from a browser on the same Wi-Fi.
 
 import (
 	"context"
@@ -17,13 +15,12 @@ import (
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/WeCodeBase/smart-speaker-mcp/config"
 )
 
-// ── Public entry point ────────────────────────────────────────────────────────
-
 // registerWebUI wires the UI HTML page and the JSON API onto the given mux.
-// All routes here are prefixed with "/" or "/api/" so they don't collide with
-// "/localfile" used by the Chromecast streaming server.
+// Called once at startup by Run() in server.go.
 func registerWebUI(mux *http.ServeMux) {
 	mux.HandleFunc("/", serveIndex)
 	mux.HandleFunc("/api/play", apiPlay)
@@ -72,8 +69,6 @@ func callTool(h mcpHandler, args map[string]any) (string, error) {
 	return extractText(res), nil
 }
 
-// extractText walks the Content slice of a CallToolResult and concatenates
-// any text payloads. Works with both value and pointer TextContent variants.
 func extractText(res *mcp.CallToolResult) string {
 	if res == nil {
 		return ""
@@ -90,7 +85,6 @@ func extractText(res *mcp.CallToolResult) string {
 	return sb.String()
 }
 
-// argsFromQuery copies known string keys from URL params into an args map.
 func argsFromQuery(r *http.Request, keys ...string) map[string]any {
 	args := map[string]any{}
 	q := r.URL.Query()
@@ -102,8 +96,6 @@ func argsFromQuery(r *http.Request, keys ...string) map[string]any {
 	return args
 }
 
-// apiSimple wraps a handler that takes only optional device_name.
-// Used by pause / resume / stop.
 func apiSimple(h mcpHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost && r.Method != http.MethodGet {
@@ -147,13 +139,12 @@ func apiVolume(w http.ResponseWriter, r *http.Request) {
 	}
 	deviceName := q.Get("device_name")
 	if deviceName == "" {
-		deviceName = cfg.DefaultDevice
+		deviceName = config.Cfg.DefaultDevice
 	}
 	if deviceName == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "device_name is required (or set default_device in config)"})
 		return
 	}
-	// set_volume expects level as a number — parse via JSON to coerce
 	var levelNum float64
 	if err := json.Unmarshal([]byte(level), &levelNum); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "level must be a number"})
@@ -174,10 +165,8 @@ func apiDevices(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	// handleDiscoverDevices returns either a JSON array of devices or a plain message.
 	var devices []map[string]any
 	if err := json.Unmarshal([]byte(text), &devices); err != nil {
-		// Not JSON — probably "No devices found". Surface raw text.
 		writeJSON(w, http.StatusOK, map[string]any{"devices": []any{}, "message": text})
 		return
 	}
@@ -187,7 +176,7 @@ func apiDevices(w http.ResponseWriter, r *http.Request) {
 func apiStatus(w http.ResponseWriter, r *http.Request) {
 	deviceName := r.URL.Query().Get("device_name")
 	if deviceName == "" {
-		deviceName = cfg.DefaultDevice
+		deviceName = config.Cfg.DefaultDevice
 	}
 	if deviceName == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "device_name required"})
@@ -199,7 +188,6 @@ func apiStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	// Pass through as raw JSON if possible
 	var parsed any
 	if err := json.Unmarshal([]byte(text), &parsed); err == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"status": parsed})
@@ -250,7 +238,6 @@ const indexHTML = `<!doctype html>
   input[type=range] { width: 100%; }
   button { padding: 0.7em 1em; border: none; border-radius: 8px; font: inherit; cursor: pointer; background: var(--accent); color: white; transition: opacity 0.15s; }
   button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
   button.secondary { background: #6b7280; }
   button.outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   .row { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 0.8em; }
@@ -372,16 +359,15 @@ async function discover() {
   const r = await fetch('/api/devices').then(r => r.json());
   const list = $('devicelist'); list.innerHTML = '';
   const sel  = $('device');
-  // Preserve current selection if still present
   const cur = sel.value;
   sel.innerHTML = '<option value="">— default from config —</option>';
   if (r.devices && r.devices.length) {
     r.devices.forEach(d => {
       const li = document.createElement('li');
-      li.textContent = d.name + ' — ' + d.host + ':' + d.port;
+      li.textContent = d.Name + ' — ' + d.Host + ':' + d.Port;
       list.appendChild(li);
       const opt = document.createElement('option');
-      opt.value = d.name; opt.textContent = d.name;
+      opt.value = d.Name; opt.textContent = d.Name;
       sel.appendChild(opt);
     });
     if (cur) sel.value = cur;
@@ -398,7 +384,6 @@ async function loadConfig() {
   status('Config: source=' + r.config.default_source + ', device=' + (r.config.default_device || '(none)') + ', music_dir=' + r.config.music_dir, true);
 }
 
-// Initial load
 discover();
 </script>
 </body>

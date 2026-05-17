@@ -1,10 +1,16 @@
 # ── Compiled binaries ─────────────────────────────────────────────────────────
 smart-speaker-mcp
 smart-speaker-mcp.exe
+smart-speaker-mcp-darwin-amd64
+smart-speaker-mcp-darwin-arm64
+smart-speaker-mcp-linux-amd64
+smart-speaker-mcp-linux-arm64
+smart-speaker-mcp-windows-amd64.exe
 google-home-mcp
 google-home-mcp.exe
 
-# ── Go build artifacts ────────────────────────────────────────────────────────
+# ── Build output ──────────────────────────────────────────────────────────────
+dist/
 *.o
 *.a
 
@@ -12,6 +18,13 @@ google-home-mcp.exe
 .env
 .env.local
 .env.*.local
+.mcpregistry_github_token
+.mcpregistry_registry_token
+*.token
+*.pem
+*.key
+*_secret*
+*_credentials*
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store
@@ -20,3 +33,9 @@ google-home-mcp.exe
 
 # ── VS Code ───────────────────────────────────────────────────────────────────
 .vscode/*.backup
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.idea/
+*.swp
+*.swo
+*~

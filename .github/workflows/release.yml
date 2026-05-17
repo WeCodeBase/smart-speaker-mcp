@@ -41,12 +41,12 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           mkdir -p dist
-          LDFLAGS="-s -w -X main.version=${VERSION}"
+          LDFLAGS="-s -w -X github.com/WeCodeBase/smart-speaker-mcp/internal/mcpserver.Version=${VERSION}"
           build() {
             local goos="$1" goarch="$2" ext="$3"
             local out="dist/smart-speaker-mcp-${goos}-${goarch}${ext}"
             echo "▶ Building $out"
-            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="$LDFLAGS" -o "$out" .
+            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="$LDFLAGS" -o "$out" ./cmd/smart-speaker-mcp
           }
           build darwin   arm64 ""
           build darwin   amd64 ""

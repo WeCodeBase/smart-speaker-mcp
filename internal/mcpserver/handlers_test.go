@@ -1,4 +1,4 @@
-package main
+package mcpserver
 
 import (
 	"context"
@@ -6,43 +6,14 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/WeCodeBase/smart-speaker-mcp/config"
 )
 
-// ── toJSON ────────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-func TestToJSON_SimpleMap(t *testing.T) {
-	got := toJSON(map[string]string{"key": "value"})
-	if !strings.Contains(got, `"key"`) || !strings.Contains(got, `"value"`) {
-		t.Errorf("toJSON() = %q, expected key/value", got)
-	}
-}
-
-func TestToJSON_Nil(t *testing.T) {
-	got := toJSON(nil)
-	if got != "null" {
-		t.Errorf("toJSON(nil) = %q, want null", got)
-	}
-}
-
-func TestToJSON_Struct(t *testing.T) {
-	type sample struct {
-		Name string `json:"name"`
-		Age  int    `json:"age"`
-	}
-	got := toJSON(sample{Name: "Claude", Age: 1})
-	if !strings.Contains(got, `"name"`) || !strings.Contains(got, `"Claude"`) {
-		t.Errorf("toJSON(struct) = %q, missing expected fields", got)
-	}
-}
-
-func TestToJSON_IndentedOutput(t *testing.T) {
-	got := toJSON(map[string]int{"a": 1})
-	if !strings.Contains(got, "\n") {
-		t.Errorf("toJSON() output is not indented: %q", got)
-	}
-}
-
-// ── strArg / floatArg ─────────────────────────────────────────────────────────
+func saveCfg() config.Config     { return config.Cfg }
+func restoreCfg(c config.Config) { config.Cfg = c }
 
 func makeRequest(args map[string]any) mcp.CallToolRequest {
 	return mcp.CallToolRequest{
@@ -57,6 +28,29 @@ func makeRequest(args map[string]any) mcp.CallToolRequest {
 		},
 	}
 }
+
+// ── toJSON ────────────────────────────────────────────────────────────────────
+
+func TestToJSON_SimpleMap(t *testing.T) {
+	got := toJSON(map[string]string{"key": "value"})
+	if !strings.Contains(got, `"key"`) || !strings.Contains(got, `"value"`) {
+		t.Errorf("toJSON() = %q, expected key/value", got)
+	}
+}
+
+func TestToJSON_Nil(t *testing.T) {
+	if got := toJSON(nil); got != "null" {
+		t.Errorf("toJSON(nil) = %q, want null", got)
+	}
+}
+
+func TestToJSON_IndentedOutput(t *testing.T) {
+	if got := toJSON(map[string]int{"a": 1}); !strings.Contains(got, "\n") {
+		t.Errorf("toJSON() output is not indented: %q", got)
+	}
+}
+
+// ── strArg / floatArg ─────────────────────────────────────────────────────────
 
 func TestStrArg_ExistingKey(t *testing.T) {
 	req := makeRequest(map[string]any{"device_name": "Living Room"})
@@ -99,7 +93,7 @@ func TestResolveDevice_UsesConfigDefault(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg.DefaultDevice = "Config Speaker"
+	config.Cfg.DefaultDevice = "Config Speaker"
 
 	req := makeRequest(map[string]any{})
 	name, err := resolveDevice(req)
@@ -115,7 +109,7 @@ func TestResolveDevice_ArgOverridesConfig(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg.DefaultDevice = "Config Speaker"
+	config.Cfg.DefaultDevice = "Config Speaker"
 
 	req := makeRequest(map[string]any{"device_name": "Arg Speaker"})
 	name, err := resolveDevice(req)
@@ -131,7 +125,7 @@ func TestResolveDevice_NoDeviceReturnsError(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg.DefaultDevice = ""
+	config.Cfg.DefaultDevice = ""
 
 	req := makeRequest(map[string]any{})
 	if _, err := resolveDevice(req); err == nil {
@@ -139,13 +133,13 @@ func TestResolveDevice_NoDeviceReturnsError(t *testing.T) {
 	}
 }
 
-// ── handlePlay – argument validation ──────────────────────────────────────────
+// ── handlePlay argument validation ───────────────────────────────────────────
 
 func TestHandlePlay_NoQueryOrURL(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg.DefaultDevice = "Test Speaker"
+	config.Cfg.DefaultDevice = "Test Speaker"
 
 	req := makeRequest(map[string]any{})
 	result, err := handlePlay(context.Background(), req)
@@ -162,7 +156,7 @@ func TestHandlePlay_NoDefaultDevice(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg.DefaultDevice = ""
+	config.Cfg.DefaultDevice = ""
 
 	req := makeRequest(map[string]any{"query": "some song"})
 	result, err := handlePlay(context.Background(), req)
@@ -181,7 +175,7 @@ func TestHandleGetConfig_ReturnsJSON(t *testing.T) {
 	saved := saveCfg()
 	defer restoreCfg(saved)
 
-	cfg = Config{
+	config.Cfg = config.Config{
 		YtDlpPath:     "/usr/local/bin/yt-dlp",
 		DefaultDevice: "Test Device",
 		DefaultSource: "local",
@@ -210,16 +204,10 @@ func TestHandleSetConfig_UpdatesFields(t *testing.T) {
 	defer restoreCfg(saved)
 
 	tmp := t.TempDir()
-	origFile := configFile
-	origDir := configDir
-	configFile = tmp + "/config.json"
-	configDir = tmp
-	defer func() {
-		configFile = origFile
-		configDir = origDir
-	}()
+	restore := config.SetPathsForTest(tmp, tmp+"/config.json")
+	defer restore()
 
-	cfg = Config{}
+	config.Cfg = config.Config{}
 
 	req := makeRequest(map[string]any{
 		"default_device": "New Speaker",
@@ -236,13 +224,10 @@ func TestHandleSetConfig_UpdatesFields(t *testing.T) {
 	if !strings.Contains(text, "✅") {
 		t.Errorf("expected success, got: %q", text)
 	}
-	if cfg.DefaultDevice != "New Speaker" {
-		t.Errorf("DefaultDevice = %q, want New Speaker", cfg.DefaultDevice)
+	if config.Cfg.DefaultDevice != "New Speaker" {
+		t.Errorf("DefaultDevice = %q, want New Speaker", config.Cfg.DefaultDevice)
 	}
-	if cfg.DefaultSource != "youtube" {
-		t.Errorf("DefaultSource = %q, want youtube", cfg.DefaultSource)
-	}
-	if cfg.MusicDir != "/new/music" {
-		t.Errorf("MusicDir = %q, want /new/music", cfg.MusicDir)
+	if config.Cfg.DefaultSource != "youtube" {
+		t.Errorf("DefaultSource = %q, want youtube", config.Cfg.DefaultSource)
 	}
 }

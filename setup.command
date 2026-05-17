@@ -45,7 +45,7 @@ echo "  ✅ vet passed"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 echo "▶ Building binary for $(uname -m)..."
-CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=4.0.0" -o smart-speaker-mcp .
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/WeCodeBase/smart-speaker-mcp/internal/mcpserver.Version=4.0.0" -o smart-speaker-mcp ./cmd/smart-speaker-mcp
 if [ $? -ne 0 ]; then echo "  ❌ Build failed"; exit 1; fi
 echo "  ✅ $BINARY_PATH"
 
