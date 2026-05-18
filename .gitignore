@@ -1,13 +1,14 @@
-# ── Compiled binaries ─────────────────────────────────────────────────────────
-smart-speaker-mcp
-smart-speaker-mcp.exe
-smart-speaker-mcp-darwin-amd64
-smart-speaker-mcp-darwin-arm64
-smart-speaker-mcp-linux-amd64
-smart-speaker-mcp-linux-arm64
-smart-speaker-mcp-windows-amd64.exe
-google-home-mcp
-google-home-mcp.exe
+# ── Compiled binaries (root only — anchored with leading slash so they
+#    do NOT match the cmd/smart-speaker-mcp/ source directory) ───────────────
+/smart-speaker-mcp
+/smart-speaker-mcp.exe
+/smart-speaker-mcp-darwin-amd64
+/smart-speaker-mcp-darwin-arm64
+/smart-speaker-mcp-linux-amd64
+/smart-speaker-mcp-linux-arm64
+/smart-speaker-mcp-windows-amd64.exe
+/google-home-mcp
+/google-home-mcp.exe
 
 # ── Build output ──────────────────────────────────────────────────────────────
 dist/
